@@ -1,0 +1,1 @@
+print("Image stored temperoroily and sent to exrach feature")
