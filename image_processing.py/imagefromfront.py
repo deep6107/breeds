@@ -1,1 +1,1 @@
-print("Image stored temperoroily and sent to exrach feature")
+#_Image stored temperoroily and sent to exrach feature
