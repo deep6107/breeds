@@ -1,0 +1,22 @@
+CATTLE / BUFFALO BREED RECOGNITION RESULT
+=============================================
+
+Breed: Surti
+Matching Features: 5
+Total Features: 6
+Matching Percentage: 83.33%
+
+Matched Features
+--------------------
+colour: black
+hump: medium
+ears: medium
+
+Breed Information
+--------------------
+origin: Gujarat
+type: Milch
+milk_fat: 7.5
+known_for: Highest milk fat ratio in medium body
+benefits: Requires very low daily feeding quantities
+species: Buffalo
