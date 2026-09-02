@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -74,7 +73,7 @@ def predict_breed(data: BreedInput):
         total_features
     )
 
-    # Return result information
+    # No matching breed
     if not matched_features_list:
         return {
             "success": False,
@@ -88,32 +87,33 @@ def predict_breed(data: BreedInput):
         key=lambda x: x.get("total_matches", 0)
     )
 
+    breed_name = best_breed.get("breed_name")
     matched_count = best_breed.get("total_matches", 0)
 
+    # Calculate matching percentage
     percentage = (
         (matched_count / total_features) * 100
         if total_features > 0
         else 0
     )
 
+    # Find breed information
+    breed_information = next(
+        (
+            item.get("breed_utility", {})
+            for item in breed_utility_list
+            if item.get("breed_name") == breed_name
+        ),
+        {}
+    )
+
     return {
         "success": True,
-        "breed_name": best_breed.get("breed_name"),
+        "breed_name": breed_name,
         "matching_features": matched_count,
         "total_features": total_features,
         "matching_percentage": round(percentage, 2),
-        "matched_features": best_breed.get(
-            "matched_features", {}
-        ),
-        "breed_information": next(
-            (
-                item.get("breed_utility", {})
-                for item in breed_utility_list
-                if item.get("breed_name")
-                == best_breed.get("breed_name")
-            ),
-            {}
-        ),
+        "breed_information": breed_information,
         "result_file": file_path
     }
 
@@ -130,4 +130,3 @@ def get_result():
         media_type="text/plain",
         filename="breed_result.txt"
     )
-
