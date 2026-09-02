@@ -1,6 +1,4 @@
 def calculate_matching_percentage(matched_count, total_features):
-    """Calculate the matching percentage."""
-
     if total_features == 0:
         return 0
 
@@ -12,10 +10,6 @@ def create_result_file(
     breed_utility_list,
     total_features
 ):
-    """
-    Create a text file containing the best breed
-    and its information.
-    """
 
     if not matched_features_list:
         with open("breed_result.txt", "w") as file:
@@ -43,6 +37,8 @@ def create_result_file(
             winning_utility = breed.get("breed_utility", {})
             break
 
+    # "w" means WRITE/OVERWRITE.
+    # It replaces the old file every time.
     with open("breed_result.txt", "w") as file:
 
         file.write("CATTLE / BUFFALO BREED RECOGNITION RESULT\n")
@@ -52,8 +48,6 @@ def create_result_file(
         file.write(f"Matching Features: {matched_count}\n")
         file.write(f"Total Features: {total_features}\n")
         file.write(f"Matching Percentage: {percentage:.2f}%\n\n")
-
-        # Matched Features section removed
 
         file.write("Breed Information\n")
         file.write("-" * 20 + "\n")

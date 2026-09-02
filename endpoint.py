@@ -1,13 +1,26 @@
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+from pydantic import BaseModel
+from typing import Dict, Any
+
+from breed_data.detect_breed import process_breed_detection
 from process import create_result_file
 
-app = FastAPI()
+
+app = FastAPI(
+    title="Breed Recognition API",
+    description="API for Indian cattle and buffalo breed recognition",
+    version="1.0"
+)
 
 
-# Allow frontend to communicate with backend
+# ---------------------------------------------------------
+# CORS
+# ---------------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,6 +30,18 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------
+# Request Model
+# ---------------------------------------------------------
+
+class BreedInput(BaseModel):
+    features: Dict[str, Any]
+
+
+# ---------------------------------------------------------
+# Home Endpoint
+# ---------------------------------------------------------
+
 @app.get("/")
 def home():
     return {
@@ -24,44 +49,85 @@ def home():
     }
 
 
-@app.get("/result")
-def get_result():
+# ---------------------------------------------------------
+# Breed Recognition Endpoint
+# ---------------------------------------------------------
 
-    # Temporary test data
-    matched_features_list = [
-        {
-            "breed_name": "Surti",
-            "total_matches": 5,
-            "matched_features": {
-                "colour": "black",
-                "hump": "medium",
-                "ears": "medium"
-            }
-        }
-    ]
+@app.post("/predict")
+def predict_breed(data: BreedInput):
 
-    breed_utility_list = [
-        {
-            "breed_name": "Surti",
-            "breed_utility": {
-                "origin": "Gujarat",
-                "type": "Milch",
-                "milk_fat": 7.5,
-                "known_for": "Highest milk fat ratio in medium body",
-                "benefits": "Requires very low daily feeding quantities",
-                "species": "Buffalo"
-            }
-        }
-    ]
+    # Get user-selected features
+    incoming_payload = data.features
 
+    # Send features to database/breed matching system
+    matched_features_list, breed_utility_list = process_breed_detection(
+        incoming_payload
+    )
+
+    # Count total features provided by user
+    total_features = len(incoming_payload)
+
+    # Create result file
     file_path = create_result_file(
         matched_features_list,
         breed_utility_list,
-        6
+        total_features
     )
 
+    # Return result information
+    if not matched_features_list:
+        return {
+            "success": False,
+            "message": "No matching breed found.",
+            "result_file": file_path
+        }
+
+    # Find best breed
+    best_breed = max(
+        matched_features_list,
+        key=lambda x: x.get("total_matches", 0)
+    )
+
+    matched_count = best_breed.get("total_matches", 0)
+
+    percentage = (
+        (matched_count / total_features) * 100
+        if total_features > 0
+        else 0
+    )
+
+    return {
+        "success": True,
+        "breed_name": best_breed.get("breed_name"),
+        "matching_features": matched_count,
+        "total_features": total_features,
+        "matching_percentage": round(percentage, 2),
+        "matched_features": best_breed.get(
+            "matched_features", {}
+        ),
+        "breed_information": next(
+            (
+                item.get("breed_utility", {})
+                for item in breed_utility_list
+                if item.get("breed_name")
+                == best_breed.get("breed_name")
+            ),
+            {}
+        ),
+        "result_file": file_path
+    }
+
+
+# ---------------------------------------------------------
+# Result File Endpoint
+# ---------------------------------------------------------
+
+@app.get("/result")
+def get_result():
+
     return FileResponse(
-        file_path,
+        "breed_result.txt",
         media_type="text/plain",
         filename="breed_result.txt"
     )
+
