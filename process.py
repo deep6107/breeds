@@ -23,7 +23,6 @@ def create_result_file(
 
         return "breed_result.txt"
 
-    # Find breed with highest number of matching features
     best_breed = max(
         matched_features_list,
         key=lambda x: x.get("total_matches", 0)
@@ -37,7 +36,6 @@ def create_result_file(
         total_features
     )
 
-    # Find utility information for winning breed
     winning_utility = {}
 
     for breed in breed_utility_list:
@@ -45,7 +43,6 @@ def create_result_file(
             winning_utility = breed.get("breed_utility", {})
             break
 
-    # Create text file
     with open("breed_result.txt", "w") as file:
 
         file.write("CATTLE / BUFFALO BREED RECOGNITION RESULT\n")
@@ -56,62 +53,12 @@ def create_result_file(
         file.write(f"Total Features: {total_features}\n")
         file.write(f"Matching Percentage: {percentage:.2f}%\n\n")
 
-        file.write("Matched Features\n")
-        file.write("-" * 20 + "\n")
+        # Matched Features section removed
 
-        matched_features = best_breed.get(
-            "matched_features", {}
-        )
-
-        for key, value in matched_features.items():
-            file.write(f"{key}: {value}\n")
-
-        file.write("\nBreed Information\n")
+        file.write("Breed Information\n")
         file.write("-" * 20 + "\n")
 
         for key, value in winning_utility.items():
             file.write(f"{key}: {value}\n")
 
     return "breed_result.txt"
-if __name__ == "__main__":
-
-    matched_features_list = [
-        {
-            "breed_name": "Surti",
-            "total_matches": 5,
-            "matched_features": {
-                "colour": "black",
-                "hump": "medium",
-                "ears": "medium"
-            }
-        },
-        {
-            "breed_name": "Nagpuri",
-            "total_matches": 3,
-            "matched_features": {
-                "colour": "black"
-            }
-        }
-    ]
-
-    breed_utility_list = [
-        {
-            "breed_name": "Surti",
-            "breed_utility": {
-                "origin": "Gujarat",
-                "type": "Milch",
-                "milk_fat": 7.5,
-                "known_for": "Highest milk fat ratio in medium body",
-                "benefits": "Requires very low daily feeding quantities",
-                "species": "Buffalo"
-            }
-        }
-    ]
-
-    file_path = create_result_file(
-        matched_features_list,
-        breed_utility_list,
-        6
-    )
-
-    print(f"Result file created: {file_path}")
