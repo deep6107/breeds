@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOVINEX | Detection Result</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <div class="logo">BOVINE<span>X</span></div>
+        <nav>
+            <a href="/">HOME</a>
+            <a href="/result" class="active">RESULTS</a>
+        </nav>
+    </header>
+
+    <main class="result-page">
+        <section class="result-heading">
+            <p class="eyebrow">ANALYSIS COMPLETE</p>
+            <h1>Breed <span>Detection Result</span></h1>
+        </section>
+
+        <div class="result-card">
+            <p class="small-title">PREDICTED BREED(S)</p>
+            <h2>{{ data.title_breeds }}</h2>
+            
+            <div class="confidence">
+                <div class="confidence-top">
+                    <span>Confidence</span>
+                    <strong>{{ data.confidence }}</strong>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" style="width: {{ data.confidence }};"></div>
+                </div>
+            </div>
+
+            <div class="breed-tabs">
+                {% for breed in data.breeds %}
+                    <div class="tab {% if loop.index == 1 %}active{% endif %}" onclick="showTab({{ loop.index0 }}, this)">
+                        {{ breed.name }}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div id="tab-content-container">
+                {% for breed in data.breeds %}
+                    <div class="info-boxes tab-content" id="content-{{ loop.index0 }}" style="display: {% if loop.index == 1 %}flex{% else %}none{% endif %}; flex-direction: column; gap: 10px;">
+                        {% for key, val in breed.details.items() %}
+                            <div class="info-row">
+                                <span>{{ key | upper | replace('_', ' ') }}</span>
+                                <b>{{ val }}</b>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <a href="/" class="again-btn">← ANALYZE ANOTHER BREED</a>
+        </div>
+    </main>
+
+    <footer>
+        © 2026 BOVINEX • CATTLE | BUFFALO BREED IDENTIFICATION
+    </footer>
+
+    <script>
+        function showTab(index, element) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+            document.getElementById('content-' + index).style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+Breed : Sahiwal : 66%
+1.Sahiwal:
+--------------------
+origin: Punjab
+species: Cattle
+type: Milch
+milk_fat: 4.55
+known_for: Highest milk yield among indigenous cows
+benefits: Tick resistance and high heat tolerance
+
