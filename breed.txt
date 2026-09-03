@@ -1,10 +1,15 @@
-Breed : Sahiwal : 66%
-1.Sahiwal:
---------------------
-origin: Punjab
-species: Cattle
-type: Milch
-milk_fat: 4.55
-known_for: Highest milk yield among indigenous cows
-benefits: Tick resistance and high heat tolerance
+Breed : Murrah : 95%
+1. Murrah
+Colour : Black
+Hump : None
+Forehead : flat
+Horns : Coiled
+Ears : Short-Alert
+Size : Large
+Origin : Haryana
+Type : Milch
+Milk Fat : 7.0
+Known For : World-renowned premium dairy performance
+Benefits : Highly adaptable to global commercial farms
+Species : Buffalo
 

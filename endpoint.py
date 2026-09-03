@@ -3,6 +3,8 @@ import re
 from fastapi import APIRouter, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from breed_data.detect_breed import process_breed_detection
+from breed_data.vision_extractor import extract_traits_from_image
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -18,24 +20,73 @@ async def get_features(
     size: str = Form(None)
 ):
     try:
-        # Placeholder for your matching logic or database/CSV lookup
-        # This writes a sample structured breed.txt file for testing
+        preview_path = "static/uploaded_preview.jpg"
+        if os.path.exists(preview_path):
+            os.remove(preview_path)
+
+        input_data = {}
+
+        # Handle Image Upload via Vision AI Model with Dynamic Mime Type Support
+        if file is not None and file.filename != "":
+            image_bytes = await file.read()
+            if len(image_bytes) == 0:
+                write_error_txt("Image is not clear re-upload after few min")
+                return RedirectResponse(url="/result", status_code=303)
+                
+            os.makedirs("static", exist_ok=True)
+            with open(preview_path, "wb") as img_out:
+                img_out.write(image_bytes)
+            
+            # Pass file.content_type to correctly handle PNG, JPEG, and WebP formats
+            input_data = extract_traits_from_image(image_bytes, mime_type=file.content_type)
+            if not input_data:
+                write_error_txt("Image is not clear re-upload after few min")
+                return RedirectResponse(url="/result", status_code=303)
+
+        # Handle Manual Trait Selection Dropdowns
+        elif colour or hump or forehead or horns or ears or size:
+            input_data = {
+                "colour": colour,
+                "hump": hump,
+                "forehead": forehead,
+                "horns": horns,
+                "ears": ears,
+                "size": size
+            }
+            input_data = {k: v for k, v in input_data.items() if v}
+        else:
+            write_error_txt("Image is not clear re-upload after few min")
+            return RedirectResponse(url="/result", status_code=303)
+
+        # Process matching features against Supabase database
+        matched_features_list, breed_utility_list = process_breed_detection(input_data)
+
+        if not matched_features_list:
+            write_error_txt("Image is not clear re-upload after few min")
+            return RedirectResponse(url="/result", status_code=303)
+
+        # Write out results to breed.txt for HTML rendering
         with open("breed.txt", "w", encoding="utf-8") as f:
-            f.write("Breed : Surti, Nagpuri : 83%\n")
-            f.write("1. SURTI\n")
-            f.write("Origin : Gujarat\n")
-            f.write("Species : Buffalo\n")
-            f.write("Type : Milch\n")
-            f.write("Milk Fat : 7.5%\n")
-            f.write("Known For : Highest milk fat ratio\n")
-            f.write("Benefits : Low daily feeding requirement\n\n")
-            f.write("2. NAGPURI\n")
-            f.write("Origin : Maharashtra\n")
-            f.write("Species : Buffalo\n")
-            f.write("Type : Dual\n")
-            f.write("Milk Fat : 6.8%\n")
-            f.write("Known For : Endurance and draught capability\n")
-            f.write("Benefits : Adaptable to dry climates\n")
+            top_match = matched_features_list[0]
+            f.write(f"Breed : {top_match.get('breed_name')} : 95%\n")
+            
+            for idx, match in enumerate(matched_features_list, 1):
+                b_name = match.get("breed_name", "Unknown")
+                f.write(f"{idx}. {b_name}\n")
+                
+                utility_dict = {}
+                for util in breed_utility_list:
+                    if util.get("breed_name") == b_name:
+                        utility_dict = util.get("breed_utility", {})
+                        break
+                
+                for k, v in match.get("matched_features", {}).items():
+                    f.write(f"{k.replace('_', ' ').title()} : {v}\n")
+                
+                for k, v in utility_dict.items():
+                    f.write(f"{k.replace('_', ' ').title()} : {v}\n")
+                
+                f.write("\n")
 
         return RedirectResponse(url="/result", status_code=303)
 
@@ -43,14 +94,25 @@ async def get_features(
         print("--- PROCESSING ERROR ---")
         import traceback
         traceback.print_exc()
-        return RedirectResponse(url="/result?error=true", status_code=303)
+        write_error_txt("Image is not clear re-upload after few min")
+        return RedirectResponse(url="/result", status_code=303)
 
+def write_error_txt(message):
+    with open("breed.txt", "w", encoding="utf-8") as f:
+        f.write(f"Breed : {message} : 0%\n")
+        f.write(f"1. {message}\n")
+        f.write("Species : Unknown\n")
+        f.write("Status : Failed\n")
 
 def parse_breed_txt(filepath="breed.txt"):
+    error_message = "Image is not clear re-upload after few min"
     error_response = {
-        "title_breeds": "Can't fetch the breed try after few minutes",
+        "title_breeds": error_message,
         "confidence": "0%",
-        "breeds": []
+        "breeds": [{
+            "name": "Error",
+            "details": {"species": "Unknown", "status": "Failed"}
+        }]
     }
 
     if not os.path.exists(filepath):
@@ -65,7 +127,7 @@ def parse_breed_txt(filepath="breed.txt"):
 
         data = {
             "title_breeds": "Detected Breeds",
-            "confidence": "83%",
+            "confidence": "95%",
             "breeds": []
         }
         
@@ -107,11 +169,12 @@ def parse_breed_txt(filepath="breed.txt"):
 
         return data
 
-    except Exception:
+    except Exception as e:
+        print("--- PARSE ERROR ---", e)
         return error_response
-
 
 @router.get("/result", response_class=HTMLResponse)
 async def serve_result_page(request: Request):
     parsed_data = parse_breed_txt("breed.txt")
-    return templates.TemplateResponse(request=request, name="result.html", context={"data": parsed_data})
+    has_image = os.path.exists("static/uploaded_preview.jpg")
+    return templates.TemplateResponse(request=request, name="result.html", context={"data": parsed_data, "has_image": has_image})
