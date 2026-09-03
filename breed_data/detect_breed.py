@@ -1,112 +1,105 @@
 import os
-import json
-from dotenv import load_dotenv
-from supabase import create_client
-from .info_breed import get_breed_utility_details
+from supabase import create_client, Client
 
-load_dotenv()
-supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key) if url and key else None
 
-def find_best_matching_breeds_features_only(input_data):
+def process_breed_detection(input_data: dict):
+    if not supabase:
+        return [], []
+
+    matched_features_list = []
+    breed_utility_list = []
+
     try:
-        # Pathway 1: Direct breed name lookup (triggered by image upload / vision extractor)
-        breed_name_query = input_data.get("breed_name", "").strip().lower()
-        if breed_name_query:
-            response = supabase.table("breed_features").select("*").ilike("breed_name", f"%{breed_name_query}%").execute()
-            rows = response.data
-            
-            if rows:
-                matches = []
-                for row in rows:
-                    matches.append({
-                        "breed_id": row.get("breed_id"),
-                        "breed_name": row.get("breed_name"),
-                        "total_matches": 10,
-                        "matched_features": {k: v for k, v in row.items() if k not in ["breed_id", "breed_name"]}
-                    })
-                return {"highest_score": 10, "total_results": len(matches), "matches": matches}
+        target_breed = input_data.get("breed_name", "").strip()
+        input_colour = input_data.get("colour", "").strip().lower()
+        
+        is_manual_input = input_colour or any(k in input_data and input_data[k] for k in ["hump", "forehead", "horns", "ears", "size"])
 
-        # Pathway 2: Original feature-matching logic (triggered by manual dropdown form inputs)
-        all_breeds = supabase.table("breed_features").select("*").execute().data
-        if not all_breeds:
-            return {"highest_score": 0, "total_results": 0, "matches": []}
-        
-        normalized_input = {str(k).lower(): str(v).strip().lower() for k, v in input_data.items() if v}
-        
-        surviving_breeds = []
-        max_matches = 0
-        
-        for row in all_breeds:
-            current_match_count = 0
-            current_matched_traits = {}
-            
-            for db_column, db_value in row.items():
-                col_lower = db_column.lower()
-                if col_lower in ["breed_id", "breed_name", "species"]:
-                    continue
-                    
-                if col_lower in normalized_input and db_value is not None:
-                    clean_db_value = str(db_value).strip().lower()
-                    user_value = normalized_input[col_lower]
-                    
-                    user_words = set(user_value.split())
-                    db_words = set(clean_db_value.split())
-                    
-                    if user_value in clean_db_value or clean_db_value in user_value or user_words.intersection(db_words):
-                        current_match_count += 1
-                        current_matched_traits[db_column] = db_value
-                        
-            if current_match_count == 0 and "species" in normalized_input:
-                db_species = str(row.get("species", "")).lower()
-                if normalized_input["species"] in db_species or db_species in normalized_input["species"]:
-                    current_match_count = 1
+        rows = []
 
-            surviving_breeds.append({
-                "breed_id": row.get("breed_id"),
-                "breed_name": row.get("breed_name"),
-                "total_matches": current_match_count,
-                "matched_features": current_matched_traits
-            })
-            
-            if current_match_count > max_matches:
-                max_matches = current_match_count
-                
-        if max_matches == 0 and all_breeds:
-            b = all_breeds[0]
-            final_winners = [{
-                "breed_id": b.get("breed_id"),
-                "breed_name": b.get("breed_name"),
-                "total_matches": 1,
-                "matched_features": {k: v for k, v in b.items() if k not in ["breed_id", "breed_name"]}
-            }]
-            max_matches = 1
+        if target_breed and not is_manual_input:
+            # Flow 1: AI Image Recognition -> Show ONLY the recognized breed
+            response = supabase.table("breed_features").select("*").ilike("breed_name", f"%{target_breed}%").execute()
+            rows = response.data or []
         else:
-            final_winners = [b for b in surviving_breeds if b["total_matches"] == max_matches and max_matches > 0]
+            # Flow 2: Manual input -> Show all matching breeds with strict colour check
+            response = supabase.table("breed_features").select("*").execute()
+            all_rows = response.data or []
 
-        return {
-            "highest_score": max_matches,
-            "total_results": len(final_winners),
-            "matches": final_winners
-        }
+            filtered_rows = []
+            for row in all_rows:
+                if input_colour:
+                    row_colour = str(row.get("colour", "") or row.get("color", "")).strip().lower()
+                    if row_colour and row_colour != "n/a":
+                        if input_colour not in row_colour and row_colour not in input_colour:
+                            continue
+
+                match_other = True
+                for k, val in input_data.items():
+                    if k not in ["breed_name", "species", "colour"] and val:
+                        row_val = str(row.get(k, "")).strip().lower()
+                        if row_val and row_val != "n/a" and val.lower().strip() not in row_val:
+                            match_other = False
+                            break
+                if match_other:
+                    filtered_rows.append(row)
+
+            rows = filtered_rows
+
+        if not rows:
+            response = supabase.table("breed_features").select("*").limit(5).execute()
+            rows = response.data or []
+
+        for row in rows:
+            b_name = row.get("breed_name") or row.get("name") or "Unknown"
+
+            # Default utility mapping from feature row
+            utility_dict = {
+                "origin": str(row.get("origin", "N/A")),
+                "type": str(row.get("type", "N/A")),
+                "milk_fat": str(row.get("milk_fat", "N/A")),
+                "known_for": str(row.get("known_for", "N/A")),
+                "benefits": str(row.get("benefits", "N/A"))
+            }
+
+            # Explicitly query the 'breed_utility' table to fetch specific utility records
+            try:
+                util_response = supabase.table("breed_utility").select("*").ilike("breed_name", f"%{b_name.strip()}%").execute()
+                if util_response.data:
+                    u_row = util_response.data[0]
+                    utility_dict = {
+                        "origin": str(u_row.get("origin") or row.get("origin") or "N/A"),
+                        "type": str(u_row.get("type") or row.get("type") or "N/A"),
+                        "milk_fat": str(u_row.get("milk_fat") or row.get("milk_fat") or "N/A"),
+                        "known_for": str(u_row.get("known_for") or row.get("known_for") or "N/A"),
+                        "benefits": str(u_row.get("benefits") or row.get("benefits") or "N/A")
+                    }
+            except Exception as util_err:
+                print(f"breed_utility table query note for {b_name}:", util_err)
+
+            traits_dict = {
+                "species": str(row.get("species", input_data.get("species", "Cattle"))),
+                "colour": str(row.get("colour") or row.get("color") or "N/A"),
+                "hump": str(row.get("hump", "N/A")),
+                "forehead": str(row.get("forehead", "N/A")),
+                "horns": str(row.get("horns", "N/A")),
+                "ears": str(row.get("ears", "N/A")),
+                "size": str(row.get("size", "N/A"))
+            }
+
+            matched_features_list.append({
+                "breed_name": b_name,
+                "matched_features": traits_dict
+            })
+            breed_utility_list.append({
+                "breed_name": b_name,
+                "breed_utility": utility_dict
+            })
 
     except Exception as e:
-        print("Supabase Processing Error:", e)
-        return {"highest_score": 0, "total_results": 0, "matches": []}
+        print("Supabase Query Error:", e)
 
-def process_breed_detection(incoming_payload):
-    feature_data = find_best_matching_breeds_features_only(incoming_payload)
-    internal_matches = feature_data.get("matches", [])
-    
-    matched_features_list = []
-    for m in internal_matches:
-        matched_features_list.append({
-            "breed_name": m.get("breed_name"),
-            "total_matches": m.get("total_matches"),
-            "matched_features": m.get("matched_features")
-        })
-    
-    utility_output_raw = get_breed_utility_details(feature_data)
-    utility_data = json.loads(utility_output_raw) if isinstance(utility_output_raw, str) else utility_output_raw
-    breed_utility_list = utility_data.get("matches", [])
-    
     return matched_features_list, breed_utility_list

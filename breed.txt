@@ -1,15 +1,15 @@
-Breed : Murrah : 95%
-1. Murrah
-Colour : Black
-Hump : None
+Breed : Tharparkar : 95%
+1. Tharparkar
+Origin : Rajasthan
+Type : Dual-Purpose
+Milk Fat : 4.4
+Known For : Excellent dairy and drought capacity
+Benefits : Thrives in desert areas and low upkeep cost
+Species : cattle
+Colour : White-Grey
+Hump : Prominent
 Forehead : flat
-Horns : Coiled
-Ears : Short-Alert
-Size : Large
-Origin : Haryana
-Type : Milch
-Milk Fat : 7.0
-Known For : World-renowned premium dairy performance
-Benefits : Highly adaptable to global commercial farms
-Species : Buffalo
+Horns : Short
+Ears : Long-Drooping
+Size : Medium
 

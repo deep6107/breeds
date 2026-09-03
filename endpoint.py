@@ -26,7 +26,6 @@ async def get_features(
 
         input_data = {}
 
-        # Handle Image Upload via Vision AI Model with Dynamic Mime Type Support
         if file is not None and file.filename != "":
             image_bytes = await file.read()
             if len(image_bytes) == 0:
@@ -37,13 +36,11 @@ async def get_features(
             with open(preview_path, "wb") as img_out:
                 img_out.write(image_bytes)
             
-            # Pass file.content_type to correctly handle PNG, JPEG, and WebP formats
             input_data = extract_traits_from_image(image_bytes, mime_type=file.content_type)
             if not input_data:
                 write_error_txt("Image is not clear re-upload after few min")
                 return RedirectResponse(url="/result", status_code=303)
 
-        # Handle Manual Trait Selection Dropdowns
         elif colour or hump or forehead or horns or ears or size:
             input_data = {
                 "colour": colour,
@@ -58,33 +55,31 @@ async def get_features(
             write_error_txt("Image is not clear re-upload after few min")
             return RedirectResponse(url="/result", status_code=303)
 
-        # Process matching features against Supabase database
+        # Properly capture both matched physical traits and utility details
         matched_features_list, breed_utility_list = process_breed_detection(input_data)
 
         if not matched_features_list:
             write_error_txt("Image is not clear re-upload after few min")
             return RedirectResponse(url="/result", status_code=303)
 
-        # Write out results to breed.txt for HTML rendering
         with open("breed.txt", "w", encoding="utf-8") as f:
             top_match = matched_features_list[0]
-            f.write(f"Breed : {top_match.get('breed_name')} : 95%\n")
+            f.write(f"Breed : {top_match.get('breed_name', 'Unknown')} : 95%\n")
             
             for idx, match in enumerate(matched_features_list, 1):
                 b_name = match.get("breed_name", "Unknown")
                 f.write(f"{idx}. {b_name}\n")
                 
-                utility_dict = {}
-                for util in breed_utility_list:
-                    if util.get("breed_name") == b_name:
-                        utility_dict = util.get("breed_utility", {})
-                        break
+                # Write utility data from breed_utility table
+                if idx - 1 < len(breed_utility_list):
+                    utility_data = breed_utility_list[idx - 1].get("breed_utility", {})
+                    for k, v in utility_data.items():
+                        f.write(f"{k.replace('_', ' ').title()} : {v}\n")
                 
+                # Write physical traits from breed_features table
                 for k, v in match.get("matched_features", {}).items():
-                    f.write(f"{k.replace('_', ' ').title()} : {v}\n")
-                
-                for k, v in utility_dict.items():
-                    f.write(f"{k.replace('_', ' ').title()} : {v}\n")
+                    if k != "breed_name":
+                        f.write(f"{k.replace('_', ' ').title()} : {v}\n")
                 
                 f.write("\n")
 
