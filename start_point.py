@@ -1,5 +1,7 @@
 import os
 import json
+import subprocess
+import sys
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +12,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# Mount static files and set up Jinja2 templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -28,23 +29,42 @@ async def get_features(
     ears: str = Form(None),
     size: str = Form(None)
 ):
-    try:
-        from llm.main import process_cattle_image
-        if file and file.filename:
-            temp_path = f"temp_{file.filename}"
-            with open(temp_path, "wb") as buffer:
-                buffer.write(await file.read())
-            try:
-                extracted_features = process_cattle_image(temp_path)
-                with open("final_result.json", "w") as f:
-                    json.dump(extracted_features, f, indent=4)
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-    except ImportError:
-        pass
+    # Route A: Image Upload
+    if file and file.filename:
+        temp_path = f"temp_{file.filename}"
+        with open(temp_path, "wb") as buffer:
+            buffer.write(await file.read())
+            
+        try:
+            # Trigger llm/main.py as an external script
+            result = subprocess.run(
+                [sys.executable, "llm/main.py", temp_path],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            # Grab the JSON string printed by your main.py file and convert it
+            extracted_features = json.loads(result.stdout)
+            
+            # Save it so result.html can read it
+            with open("final_result.json", "w") as f:
+                json.dump(extracted_features, f, indent=4)
+                
+        except subprocess.CalledProcessError as e:
+            # If main.py crashes, this catches the exact error message
+            print(f"AI Script Error: {e.stderr}") 
+            raise HTTPException(status_code=500, detail="Image processing failed.")
+        except json.JSONDecodeError:
+            print(f"Failed to parse JSON. Script output: {result.stdout}")
+            raise HTTPException(status_code=500, detail="Invalid data returned from AI.")
+        finally:
+            # Clean up the uploaded image
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
-    if any([colour, hump, forehead, horns, ears, size]):
+    # Route B: Manual Form Selections
+    elif any([colour, hump, forehead, horns, ears, size]):
         manual_result = {
             "predicted_breed": "Manual Detection",
             "confidence": "N/A",
@@ -58,12 +78,10 @@ async def get_features(
         with open("final_result.json", "w") as f:
             json.dump(manual_result, f, indent=4)
 
-    # Redirect the browser to the /result page URL
     return RedirectResponse(url="/result", status_code=303)
 
 @app.get("/result", response_class=HTMLResponse)
 async def serve_result_page(request: Request):
-    # Default fallback data if the JSON is missing or incomplete
     data = {
         "predicted_breed": "Analysis Pending",
         "confidence": "0%",
@@ -84,5 +102,4 @@ async def serve_result_page(request: Request):
         except Exception:
             pass
 
-    # This passes the Python 'data' dictionary directly into the HTML file
     return templates.TemplateResponse("result.html", {"request": request, "data": data})
