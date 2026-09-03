@@ -1,63 +1,56 @@
 def calculate_matching_percentage(matched_count, total_features):
-    if total_features == 0:
+    if not total_features:
         return 0
-
     return (matched_count / total_features) * 100
-
 
 def create_result_file(
     matched_features_list,
     breed_utility_list,
-    total_features
+    total_features=6,
+    filepath="breed.txt"
 ):
-
     if not matched_features_list:
-        with open("breed_result.txt", "w") as file:
-            file.write("No matching breed found.\n")
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write("Breed : No matching breed found : 0%\n")
+        return filepath
 
-        return "breed_result.txt"
-
-    # Find the breed with the highest number of matching features
-    best_breed = max(
+    # Sort breeds by total matches descending (take top 3 for tabs)
+    sorted_breeds = sorted(
         matched_features_list,
-        key=lambda x: x.get("total_matches", 0)
-    )
+        key=lambda x: x.get("total_matches", 0),
+        reverse=True
+    )[:3]
 
-    breed_name = best_breed.get("breed_name")
-    matched_count = best_breed.get("total_matches", 0)
-
-    # Calculate matching percentage
-    percentage = calculate_matching_percentage(
-        matched_count,
+    best_breed = sorted_breeds[0]
+    best_percentage = calculate_matching_percentage(
+        best_breed.get("total_matches", 0),
         total_features
     )
 
-    # Find utility/information of the winning breed
-    winning_utility = {}
+    # Build breed header string: "Breed : Surti, Nagpuri, Pandharpuri : 83%"
+    breed_names = [b.get("breed_name", "Unknown").capitalize() for b in sorted_breeds]
+    title_string = ", ".join(breed_names)
 
-    for breed in breed_utility_list:
-        if breed.get("breed_name") == breed_name:
-            winning_utility = breed.get("breed_utility", {})
-            break
+    # Map utility details by breed name for quick lookup
+    utility_map = {
+        item.get("breed_name", "").lower(): item.get("breed_utility", {})
+        for item in breed_utility_list
+    }
 
-    # Create/overwrite the result file
-    with open("breed_result.txt", "w") as file:
+    with open(filepath, "w", encoding="utf-8") as file:
+        file.write(f"Breed : {title_string} : {int(best_percentage)}%\n")
 
-        file.write("CATTLE / BUFFALO BREED RECOGNITION RESULT\n")
-        file.write("=" * 45 + "\n\n")
+        for idx, breed in enumerate(sorted_breeds, start=1):
+            name = breed.get("breed_name", "Unknown").capitalize()
+            details = utility_map.get(name.lower(), {})
 
-        file.write(f"Breed: {breed_name}\n")
-        file.write(f"Matching Features: {matched_count}\n")
-        file.write(f"Total Features: {total_features}\n")
-        file.write(f"Matching Percentage: {percentage:.2f}%\n\n")
+            file.write(f"{idx}.{name}:\n")
+            file.write("-" * 20 + "\n")
+            file.write(f"origin: {details.get('origin', 'N/A')}\n")
+            file.write(f"species: {details.get('species', 'N/A')}\n")
+            file.write(f"type: {details.get('type', 'N/A')}\n")
+            file.write(f"milk_fat: {details.get('milk_fat', 'N/A')}\n")
+            file.write(f"known_for: {details.get('known_for', 'N/A')}\n")
+            file.write(f"benefits: {details.get('benefits', 'N/A')}\n\n")
 
-        # Individual matched features are intentionally NOT written.
-        # Only the breed information is displayed.
-
-        file.write("Breed Information\n")
-        file.write("-" * 20 + "\n")
-
-        for key, value in winning_utility.items():
-            file.write(f"{key}: {value}\n")
-
-    return "breed_result.txt"
+    return filepath

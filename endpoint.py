@@ -7,7 +7,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 def parse_breed_txt(filepath="breed.txt"):
-    """Reads the custom breed.txt file and structures it for the HTML template."""
+    """Reads breed.txt and structures it for the dynamic HTML tabs."""
     data = {
         "title_breeds": "Analysis Pending",
         "confidence": "0%",
@@ -23,6 +23,7 @@ def parse_breed_txt(filepath="breed.txt"):
     if not lines:
         return data
 
+    # 1. Parse header line: "Breed : Surti, Nagpuri : 83%"
     first_line = lines[0]
     if first_line.startswith("Breed :"):
         parts = first_line.split(":")
@@ -30,18 +31,18 @@ def parse_breed_txt(filepath="breed.txt"):
             data["title_breeds"] = parts[1].strip()
             data["confidence"] = parts[2].strip()
 
-    current_breed = {}
+    # 2. Parse individual breed sections
+    current_breed = None
     for line in lines[1:]:
         if line.startswith("-"):
             continue
-            
+
+        # Detect block header like "1.Surti:"
         if line[0].isdigit() and "." in line and line.endswith(":"):
             if current_breed:
                 data["breeds"].append(current_breed)
             current_breed = {"name": line.replace(":", "").strip(), "details": {}}
-            
-    
-        elif ":" in line and current_breed:
+        elif ":" in line and current_breed is not None:
             key, val = line.split(":", 1)
             current_breed["details"][key.strip()] = val.strip()
 
