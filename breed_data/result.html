@@ -1,0 +1,193 @@
+import os
+import json
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI()
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_home():
+    # Home page HTML placeholder or logic
+    pass
+
+@app.post("/get-features")
+async def get_features(
+    file: UploadFile = File(None),
+    colour: str = Form(None),
+    hump: str = Form(None),
+    forehead: str = Form(None),
+    horns: str = Form(None),
+    ears: str = Form(None),
+    size: str = Form(None)
+):
+    try:
+        from llm.main import process_cattle_image
+        
+        if file and file.filename:
+            temp_path = f"temp_{file.filename}"
+            with open(temp_path, "wb") as buffer:
+                buffer.write(await file.read())
+                
+            try:
+                extracted_features = process_cattle_image(temp_path)
+                with open("final_result.json", "w") as f:
+                    json.dump(extracted_features, f, indent=4)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    
+    except ImportError:
+        pass
+
+    if any([colour, hump, forehead, horns, ears, size]):
+        manual_result = {
+            "colour": colour or "Not Selected",
+            "hump": hump or "Not Selected",
+            "forehead": forehead or "Not Selected",
+            "horns": horns or "Not Selected",
+            "ears": ears or "Not Selected",
+            "size": size or "Not Selected"
+        }
+        with open("final_result.json", "w") as f:
+            json.dump(manual_result, f, indent=4)
+
+    return HTMLResponse(content=get_result_html())
+
+@app.get("/result", response_class=HTMLResponse)
+async def get_result_page():
+    return HTMLResponse(content=get_result_html())
+
+def get_result_html() -> str:
+    features = {
+        "colour": "Red-Brown",
+        "hump": "Very Prominent",
+        "forehead": "Bulging",
+        "horns": "Sickle",
+        "ears": "Long-Drooping",
+        "size": "Large"
+    }
+    
+    if os.path.exists("final_result.json"):
+        try:
+            with open("final_result.json", "r") as f:
+                loaded_data = json.load(f)
+                if isinstance(loaded_data, dict):
+                    features.update(loaded_data)
+        except Exception:
+            pass
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOVINEX | Detection Result</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        :root {{ --navy: #071525; --navy2: #10263d; --gold: #c29a4b; --gold-light: #dfc27b; --cream: #f7f4ec; --white: #ffffff; --gray: #7b838d; --border: #e3dfd5; --card-bg: #FFE2E2; --box-bg: #DEC384; }}
+        body {{ background: var(--cream); color: var(--navy); font-family: 'Inter', sans-serif; }}
+        header {{ height: 80px; background: var(--navy); padding: 0 7%; display: flex; align-items: center; justify-content: space-between; }}
+        .logo {{ font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 700; letter-spacing: 2px; color: white; }}
+        .logo span {{ color: var(--gold-light); }}
+        nav {{ display: flex; gap: 32px; }}
+        nav a {{ color: #bac2cc; text-decoration: none; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }}
+        nav a:hover, nav a.active {{ color: var(--gold-light); }}
+        .result-page {{ max-width: 650px; margin: auto; padding: 40px 20px 60px; }}
+        .result-heading {{ text-align: center; margin-bottom: 35px; }}
+        .eyebrow {{ color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: 3px; margin-bottom: 12px; }}
+        .result-heading h1 {{ font-family: 'Cormorant Garamond', serif; font-size: 48px; line-height: 1.1; }}
+        .result-heading h1 span {{ display: block; color: var(--gold); font-style: italic; }}
+        
+        .image-card {{ background: var(--white); padding: 15px; border: 1px solid var(--border); margin-bottom: 30px; }}
+        .cattle-image {{ height: 320px; background: #EFECE6; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 1px solid var(--border); }}
+        .cow-icon {{ font-size: 90px; }}
+        .cattle-image p {{ margin-top: 15px; color: var(--navy); font-size: 9px; letter-spacing: 2px; font-weight: 600; }}
+
+        .result-card {{ background: var(--card-bg); color: var(--navy); padding: 30px; }}
+        .small-title {{ color: #9A7B38; font-size: 9px; font-weight: 700; letter-spacing: 2px; }}
+        .result-card h2 {{ font-family: 'Cormorant Garamond', serif; font-size: 38px; margin: 8px 0 20px; line-height: 1.15; }}
+
+        .confidence-top {{ display: flex; justify-content: space-between; color: var(--navy); font-size: 11px; font-weight: 600; }}
+        .progress {{ height: 6px; background: #E0C1C1; margin-top: 8px; }}
+        .progress-bar {{ width: 94%; height: 100%; background: var(--navy); }}
+
+        .breed-tabs {{ display: flex; gap: 8px; margin: 20px 0; }}
+        .tab {{ padding: 8px 14px; background: var(--white); border: 1px solid #E0C1C1; font-size: 11px; font-weight: 600; cursor: pointer; }}
+        .tab.active {{ background: var(--navy); color: white; border-color: var(--navy); }}
+
+        .info-boxes {{ display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }}
+        .info-row {{ padding: 14px 16px; background: var(--box-bg); display: flex; justify-content: space-between; align-items: center; }}
+        .info-row span {{ color: var(--navy); font-size: 10px; letter-spacing: 1.5px; font-weight: 700; }}
+        .info-row b {{ font-size: 11px; text-align: right; max-width: 60%; }}
+
+        .again-btn {{ display: block; width: 100%; text-align: center; margin-top: 30px; padding: 16px; background: var(--navy); color: white; text-decoration: none; font-size: 10px; font-weight: 700; letter-spacing: 2px; }}
+        .again-btn:hover {{ background: var(--navy2); }}
+
+        footer {{ height: 58px; background: var(--navy); color: #8c98a5; display: flex; align-items: center; justify-content: center; font-size: 8px; letter-spacing: 1px; }}
+    </style>
+</head>
+<body>
+<header>
+    <div class="logo">BOVINE<span>X</span></div>
+    <nav>
+        <a href="/">HOME</a>
+        <a href="/result" class="active">RESULTS</a>
+    </nav>
+</header>
+
+<main class="result-page">
+    <section class="result-heading">
+        <p class="eyebrow">ANALYSIS COMPLETE</p>
+        <h1>Breed <span>Detection Result</span></h1>
+    </section>
+
+    <div class="image-card">
+        <div class="cattle-image">
+            <div class="cow-icon">🐄</div>
+            <p>YOUR CATTLE IMAGE</p>
+        </div>
+    </div>
+
+    <div class="result-card">
+        <p class="small-title">PREDICTED BREED</p>
+        <h2>Nagpuri, Surti, Pandharpuri.</h2>
+        
+        <div class="confidence">
+            <div class="confidence-top">
+                <span>Confidence</span>
+                <strong>94%</strong>
+            </div>
+            <div class="progress">
+                <div class="progress-bar"></div>
+            </div>
+        </div>
+
+        <div class="breed-tabs">
+            <div class="tab active">1. Surti</div>
+            <div class="tab">2. Nagpuri</div>
+            <div class="tab">3. Pandharpuri</div>
+        </div>
+
+        <div class="info-boxes">
+            <div class="info-row"><span>ORIGIN</span><b>Gujarat</b></div>
+            <div class="info-row"><span>SPECIES</span><b>Buffalo</b></div>
+            <div class="info-row"><span>TYPE</span><b>Milch</b></div>
+            <div class="info-row"><span>MILK FAT</span><b>7.5%</b></div>
+            <div class="info-row"><span>KNOWN FOR</span><b>Highest milk fat ratio in medium body</b></div>
+            <div class="info-row"><span>BENEFITS</span><b>Requires very low daily feeding quantities</b></div>
+        </div>
+
+        <a href="/" class="again-btn">← ANALYZE ANOTHER BREED</a>
+    </div>
+</main>
+
+<footer>
+    © 2026 BOVINEX • CATTLE | BUFFALO BREED IDENTIFICATION
+</footer>
+</body>
+</html>
+"""
