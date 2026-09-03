@@ -1,0 +1,15 @@
+Breed : Murrah : 95%
+1. Murrah
+Colour : Black
+Hump : None
+Forehead : flat
+Horns : Coiled
+Ears : Short-Alert
+Size : Large
+Origin : Haryana
+Type : Milch
+Milk Fat : 7.0
+Known For : World-renowned premium dairy performance
+Benefits : Highly adaptable to global commercial farms
+Species : Buffalo
+

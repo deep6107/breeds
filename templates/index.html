@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOVINEX | Cattle & Buffalo Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <div class="logo">BOVINE<span>X</span></div>
+        <nav>
+            <a href="/" class="active">HOME</a>
+            <a href="/result">RESULTS</a>
+        </nav>
+    </header>
+
+    <main class="home-page">
+        <section class="heading">
+            <h1>Cattle & Buffalo <span>Detection</span></h1>
+            <p>Upload an image or select physical traits from the options below.</p>
+        </section>
+
+        <form action="/get-features" method="POST" enctype="multipart/form-data" class="detection-form">
+            <div class="upload-section">
+                <p class="small-title">1. UPLOAD IMAGE</p>
+                <input type="file" name="file" accept="image/*" class="file-input">
+            </div>
+
+            <div class="manual-section">
+                <p class="small-title">2. OR SELECT PHYSICAL TRAITS</p>
+                <div class="grid-inputs">
+                    <select name="colour">
+                        <option value="">Select Colour</option>
+                        <option value="Black">Black</option>
+                        <option value="Brown">Brown</option>
+                        <option value="Red-Brown">Red-Brown</option>
+                        <option value="Spotted">Spotted</option>
+                        <option value="White-Grey">White-Grey</option>
+                    </select>
+
+                    <select name="hump">
+                        <option value="">Select Hump</option>
+                        <option value="None">None</option>
+                        <option value="Prominent">Prominent</option>
+                        <option value="Very Prominent">Very Prominent</option>
+                    </select>
+
+                    <select name="forehead">
+                        <option value="">Select Forehead</option>
+                        <option value="bulging">Bulging</option>
+                        <option value="dished">Dished</option>
+                        <option value="flat">Flat</option>
+                    </select>
+
+                    <select name="horns">
+                        <option value="">Select Horns</option>
+                        <option value="Coiled">Coiled</option>
+                        <option value="Giant-V">Giant-V</option>
+                        <option value="Half-Moon">Half-Moon</option>
+                        <option value="Short">Short</option>
+                        <option value="Sickle">Sickle</option>
+                    </select>
+
+                    <select name="ears">
+                        <option value="">Select Ears</option>
+                        <option value="Long-Drooping">Long-Drooping</option>
+                        <option value="Short-Alert">Short-Alert</option>
+                    </select>
+
+                    <select name="size">
+                        <option value="">Select Body Size</option>
+                        <option value="Large">Large</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Small-Dwarf">Small-Dwarf</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">ANALYZE BREED →</button>
+        </form>
+    </main>
+
+    <footer>
+        © 2026 BOVINEX • CATTLE | BUFFALO BREED IDENTIFICATION
+    </footer>
+</body>
+</html>
