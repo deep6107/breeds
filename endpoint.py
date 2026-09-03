@@ -1,132 +1,56 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+import os
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
-from pydantic import BaseModel
-from typing import Dict, Any
+router = APIRouter()
+templates = Jinja2Templates(directory="templates")
 
-from breed_data.detect_breed import process_breed_detection
-from process import create_result_file
-
-
-app = FastAPI(
-    title="Breed Recognition API",
-    description="API for Indian cattle and buffalo breed recognition",
-    version="1.0"
-)
-
-
-# ---------------------------------------------------------
-# CORS
-# ---------------------------------------------------------
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
-
-
-# ---------------------------------------------------------
-# Request Model
-# ---------------------------------------------------------
-
-class BreedInput(BaseModel):
-    features: Dict[str, Any]
-
-
-# ---------------------------------------------------------
-# Home Endpoint
-# ---------------------------------------------------------
-
-@app.get("/")
-def home():
-    return {
-        "message": "Breed Recognition Backend is running"
+def parse_breed_txt(filepath="breed.txt"):
+    """Reads the custom breed.txt file and structures it for the HTML template."""
+    data = {
+        "title_breeds": "Analysis Pending",
+        "confidence": "0%",
+        "breeds": []
     }
+    
+    if not os.path.exists(filepath):
+        return data
 
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f.readlines() if line.strip()]
 
-# ---------------------------------------------------------
-# Breed Recognition Endpoint
-# ---------------------------------------------------------
+    if not lines:
+        return data
 
-@app.post("/predict")
-def predict_breed(data: BreedInput):
+    first_line = lines[0]
+    if first_line.startswith("Breed :"):
+        parts = first_line.split(":")
+        if len(parts) >= 3:
+            data["title_breeds"] = parts[1].strip()
+            data["confidence"] = parts[2].strip()
 
-    # Get user-selected features
-    incoming_payload = data.features
+    current_breed = {}
+    for line in lines[1:]:
+        if line.startswith("-"):
+            continue
+            
+        if line[0].isdigit() and "." in line and line.endswith(":"):
+            if current_breed:
+                data["breeds"].append(current_breed)
+            current_breed = {"name": line.replace(":", "").strip(), "details": {}}
+            
+    
+        elif ":" in line and current_breed:
+            key, val = line.split(":", 1)
+            current_breed["details"][key.strip()] = val.strip()
 
-    # Send features to database/breed matching system
-    matched_features_list, breed_utility_list = process_breed_detection(
-        incoming_payload
-    )
+    if current_breed:
+        data["breeds"].append(current_breed)
 
-    # Count total features provided by user
-    total_features = len(incoming_payload)
+    return data
 
-    # Create result file
-    file_path = create_result_file(
-        matched_features_list,
-        breed_utility_list,
-        total_features
-    )
-
-    # No matching breed
-    if not matched_features_list:
-        return {
-            "success": False,
-            "message": "No matching breed found.",
-            "result_file": file_path
-        }
-
-    # Find best breed
-    best_breed = max(
-        matched_features_list,
-        key=lambda x: x.get("total_matches", 0)
-    )
-
-    breed_name = best_breed.get("breed_name")
-    matched_count = best_breed.get("total_matches", 0)
-
-    # Calculate matching percentage
-    percentage = (
-        (matched_count / total_features) * 100
-        if total_features > 0
-        else 0
-    )
-
-    # Find breed information
-    breed_information = next(
-        (
-            item.get("breed_utility", {})
-            for item in breed_utility_list
-            if item.get("breed_name") == breed_name
-        ),
-        {}
-    )
-
-    return {
-        "success": True,
-        "breed_name": breed_name,
-        "matching_features": matched_count,
-        "total_features": total_features,
-        "matching_percentage": round(percentage, 2),
-        "breed_information": breed_information,
-        "result_file": file_path
-    }
-
-
-# ---------------------------------------------------------
-# Result File Endpoint
-# ---------------------------------------------------------
-
-@app.get("/result")
-def get_result():
-
-    return FileResponse(
-        "breed_result.txt",
-        media_type="text/plain",
-        filename="breed_result.txt"
-    )
+@router.get("/result", response_class=HTMLResponse)
+async def serve_result_page(request: Request):
+    parsed_data = parse_breed_txt("breed.txt")
+    return templates.TemplateResponse("result.html", {"request": request, "data": parsed_data})
